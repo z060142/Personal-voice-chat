@@ -1,0 +1,30 @@
+audio:
+  # 執行 python list_devices.py 查看設備編號
+  input_device: null        # 你的真實麥克風
+  output_device: null       # VB-Audio CABLE Input（虛擬麥克風輸入端）
+  loopback_device: null     # 捕捉遊戲聲音的設備（Stereo Mix 或 VoiceMeeter 輸出）
+  sample_rate: 16000
+  block_size: 512           # 32ms @ 16kHz，配合 silero-vad 最佳大小
+
+my_language: "zh"           # 你說的語言
+partner_language: "en"      # 對方說的語言
+
+stt:
+  model: "large-v3"         # 或 medium 節省 VRAM
+  device: "cuda"
+  compute_type: "float16"
+
+translation:
+  openrouter_api_key: ""    # 留空則讀 OPENROUTER_API_KEY 環境變數
+  model: "openai/gpt-4o"    # 可換 openai/gpt-4o-mini、google/gemini-flash-1.5 等
+
+tts:
+  fish_speech_url: "http://127.0.0.1:8080"
+  reference_audio: "reference.wav"   # 你的聲音樣本（10-30 秒）
+  reference_text: ""                  # reference.wav 的逐字稿（可空）
+
+vad:
+  threshold: 0.5
+  min_speech_ms: 300
+  min_silence_ms: 700       # 靜音多久才算一句話結束
+  max_speech_ms: 30000      # 超過強制切斷
