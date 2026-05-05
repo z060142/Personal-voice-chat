@@ -32,9 +32,16 @@ _BASE_SYSTEM = (
 
 class Translator:
     def __init__(self, api_key: str = None, model: str = "openai/gpt-4o", game_context: str = ""):
+        key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+        if not key:
+            raise ValueError(
+                "未設定 OpenRouter API key。\n"
+                "請在 config.yaml 填入 translation.openrouter_api_key，\n"
+                "或設定環境變數 OPENROUTER_API_KEY。"
+            )
         self.client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
-            api_key=api_key or os.environ["OPENROUTER_API_KEY"],
+            api_key=key,
         )
         self.model = model
         ctx = f"Game: {game_context}. " if game_context.strip() else ""

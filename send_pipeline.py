@@ -1,8 +1,11 @@
+import datetime
 import logging
+import os
 import queue
 import threading
 
 import numpy as np
+import soundfile as sf
 
 from audio_io import AudioCapture, play_audio, resolve_device
 from stt import WhisperSTT
@@ -11,6 +14,8 @@ from tts_client import FishSpeechTTS
 from vad import SileroVAD
 
 log = logging.getLogger(__name__)
+
+_QUEUE_MAXSIZE = 20
 
 
 class SendPipeline:
@@ -21,7 +26,8 @@ class SendPipeline:
     - VAD 模式（預設）：自動偵測語音結束
     - PTT 模式：按住指定按鍵才錄音
     - 暫停/繼續（F9 預設）
-    - 字幕顯示 TTS 內容與狀態
+    - 字幕同時顯示原文與翻譯
+    - debug.save_utterances：保存每句錄音與辨識文字
     """
 
     def __init__(
@@ -49,9 +55,14 @@ class SendPipeline:
         self._my_lang = cfg["my_language"]
         self._partner_lang = cfg["partner_language"]
         self._out_dev = resolve_device(audio.get("output_device"))
+        self._sample_rate = audio["sample_rate"]
 
-        self._speech_q: queue.Queue[np.ndarray] = queue.Queue()
-        self._tts_q: queue.Queue[str] = queue.Queue()
+        debug_cfg = cfg.get("debug", {})
+        self._debug_save = debug_cfg.get("save_utterances", False)
+        self._debug_dir = debug_cfg.get("output_dir", "debug_audio")
+
+        self._speech_q: queue.Queue[np.ndarray] = queue.Queue(maxsize=_QUEUE_MAXSIZE)
+        self._tts_q: queue.Queue[str] = queue.Queue(maxsize=_QUEUE_MAXSIZE)
         self._playing = threading.Event()
         self._paused = threading.Event()
         self._ptt_mode = False
@@ -85,7 +96,7 @@ class SendPipeline:
         self._ptt_active.clear()
         remaining = self._vad.force_flush()
         if remaining is not None:
-            self._speech_q.put(remaining)
+            self._enqueue_speech(remaining)
         self._push_status()
 
     def set_ptt_mode(self, enabled: bool, key_label: str = "PTT"):
@@ -101,12 +112,18 @@ class SendPipeline:
             return False
         return True
 
+    def _enqueue_speech(self, audio: np.ndarray) -> None:
+        try:
+            self._speech_q.put_nowait(audio)
+        except queue.Full:
+            log.warning("send speech_q 已滿，捨棄此段錄音")
+
     def _on_chunk(self, chunk: np.ndarray) -> None:
         if not self._should_record():
             return
         result = self._vad.process_chunk(chunk)
         if result is not None:
-            self._speech_q.put(result)
+            self._enqueue_speech(result)
 
     def _push_status(self):
         if not self._subtitle:
@@ -125,6 +142,17 @@ class SendPipeline:
             s = f"● 活躍 (VAD)  |  佇列: {q}  [F9 暫停]"
         self._subtitle.update_status(s)
 
+    def _save_debug(self, prefix: str, audio: np.ndarray, stt_text: str, translated: str) -> None:
+        try:
+            os.makedirs(self._debug_dir, exist_ok=True)
+            ts = datetime.datetime.now().strftime("%H%M%S_%f")[:9]
+            base = os.path.join(self._debug_dir, f"{prefix}_{ts}")
+            sf.write(f"{base}.wav", audio, self._sample_rate)
+            with open(f"{base}.txt", "w", encoding="utf-8") as f:
+                f.write(f"STT: {stt_text}\nTranslated: {translated}\n")
+        except Exception as e:
+            log.warning("debug save 失敗: %s", e)
+
     def _stt_worker(self) -> None:
         while not self._stop.is_set():
             try:
@@ -136,10 +164,17 @@ class SendPipeline:
                 if not text:
                     continue
                 log.info("[STT %s] %s", lang, text)
+                if self._subtitle:
+                    self._subtitle.update_send_original(f"我原文: {text}")
                 translated = self._translator.translate(text, lang, self._partner_lang)
                 if translated:
                     log.info("[→%s] %s", self._partner_lang, translated)
-                    self._tts_q.put(translated)
+                    if self._debug_save:
+                        self._save_debug("send", audio, text, translated)
+                    try:
+                        self._tts_q.put_nowait(translated)
+                    except queue.Full:
+                        log.warning("send tts_q 已滿，捨棄此段翻譯")
                     self._push_status()
             except Exception as e:
                 log.error("STT/translate error: %s", e)

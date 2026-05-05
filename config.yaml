@@ -38,3 +38,7 @@ ui:
   font_size: 18
   opacity: 0.85
   no_ui: false              # true = 停用字幕視窗
+
+debug:
+  save_utterances: false    # true = 保存每句錄音與辨識文字，用於排查音訊問題
+  output_dir: "debug_audio" # 保存目錄

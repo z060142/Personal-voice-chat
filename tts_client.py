@@ -33,7 +33,11 @@ class FishSpeechTTS:
         }
         with httpx.Client(timeout=30.0) as client:
             r = client.post(self.url, json=payload)
-            r.raise_for_status()
+            if not r.is_success:
+                body_preview = r.text[:500] if r.text else "(empty)"
+                raise RuntimeError(
+                    f"Fish Speech server 回傳錯誤 {r.status_code}：{body_preview}"
+                )
         audio, sr = sf.read(io.BytesIO(r.content))
         if audio.ndim > 1:
             audio = audio.mean(axis=1)  # 轉單聲道

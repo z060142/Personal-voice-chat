@@ -6,10 +6,12 @@ class SubtitleWindow:
     """
     常駐在螢幕底部的字幕視窗。
 
-    三行顯示：
+    五行顯示：
       1. 狀態列（灰色）：活躍/暫停/PTT + 佇列數
-      2. 發送列（金黃）：TTS 目前播放的內容
-      3. 接收列（白色）：對方語音的翻譯結果
+      2. 我原文（暗金）：自己說話的 STT 原文
+      3. 我譯文（亮金 bold）：TTS 播放的翻譯結果
+      4. 對方原文（暗白）：對方語音的 STT 原文
+      5. 對方譯文（白色）：對方翻譯後的字幕
 
     show() / update_* 可從任意執行緒呼叫。
     run() 必須在主執行緒呼叫（Windows tkinter 限制）。
@@ -21,7 +23,9 @@ class SubtitleWindow:
         self.opacity = opacity
         self._root = None
         self._status_label = None
+        self._send_orig_label = None
         self._send_label = None
+        self._recv_orig_label = None
         self._recv_label = None
 
     # ── Thread-safe update API ────────────────────────────────────────────
@@ -29,8 +33,14 @@ class SubtitleWindow:
     def update_status(self, text: str) -> None:
         self._q.put(("status", text))
 
+    def update_send_original(self, text: str) -> None:
+        self._q.put(("send_orig", text))
+
     def update_send(self, text: str) -> None:
         self._q.put(("send", text))
+
+    def update_receive_original(self, text: str) -> None:
+        self._q.put(("recv_orig", text))
 
     def update_receive(self, text: str) -> None:
         self._q.put(("receive", text))
@@ -50,7 +60,6 @@ class SubtitleWindow:
         self._root.configure(bg="#111111")
 
         sw = self._root.winfo_screenwidth()
-        sh = self._root.winfo_screenheight()
 
         self._status_label = tk.Label(
             self._root,
@@ -62,9 +71,23 @@ class SubtitleWindow:
             justify="left",
             anchor="w",
             padx=14,
-            pady=3,
+            pady=2,
         )
         self._status_label.pack(fill="x")
+
+        self._send_orig_label = tk.Label(
+            self._root,
+            text="",
+            font=("Arial", self.font_size - 3),
+            fg="#A08020",
+            bg="#111111",
+            wraplength=sw - 80,
+            justify="left",
+            anchor="w",
+            padx=14,
+            pady=1,
+        )
+        self._send_orig_label.pack(fill="x")
 
         self._send_label = tk.Label(
             self._root,
@@ -76,9 +99,23 @@ class SubtitleWindow:
             justify="left",
             anchor="w",
             padx=14,
-            pady=4,
+            pady=3,
         )
         self._send_label.pack(fill="x")
+
+        self._recv_orig_label = tk.Label(
+            self._root,
+            text="",
+            font=("Arial", self.font_size - 3),
+            fg="#666666",
+            bg="#111111",
+            wraplength=sw - 80,
+            justify="left",
+            anchor="w",
+            padx=14,
+            pady=1,
+        )
+        self._recv_orig_label.pack(fill="x")
 
         self._recv_label = tk.Label(
             self._root,
@@ -90,13 +127,14 @@ class SubtitleWindow:
             justify="left",
             anchor="w",
             padx=14,
-            pady=4,
+            pady=3,
         )
         self._recv_label.pack(fill="x")
 
         self._root.update_idletasks()
         w = self._root.winfo_width()
         h = self._root.winfo_height()
+        sh = self._root.winfo_screenheight()
         self._root.geometry(f"+{(sw - w) // 2}+{sh - h - 80}")
 
         self._root.after(80, self._poll)
@@ -111,8 +149,12 @@ class SubtitleWindow:
                     return
                 elif cmd == "status":
                     self._status_label.config(text=data)
+                elif cmd == "send_orig":
+                    self._send_orig_label.config(text=data)
                 elif cmd == "send":
                     self._send_label.config(text=data)
+                elif cmd == "recv_orig":
+                    self._recv_orig_label.config(text=data)
                 elif cmd == "receive":
                     self._recv_label.config(text=data)
         except queue.Empty:
