@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.env
+*.wav
+!reference.wav
+debug_audio/
