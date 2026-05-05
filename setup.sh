@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 一鍵安裝 personal-voice-chat 工具鏈
+# 一鍵安裝 personal-voice-chat 工具鏈（Linux / macOS）
+# Windows 用戶請改用：powershell -ExecutionPolicy Bypass -File setup.ps1
 # 用法：bash setup.sh
 set -euo pipefail
 
