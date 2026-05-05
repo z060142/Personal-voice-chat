@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 class ReceivePipeline:
     """
-    接收管道：遊戲/Discord 音頻（loopback）→ VAD → Whisper STT → OpenRouter 翻譯 → 螢幕字幕
+    接收管道：遊戲/Discord 音頻（loopback）→ VAD → Whisper STT → OpenRouter 翻譯 → 字幕
     """
 
     def __init__(
@@ -70,7 +70,7 @@ class ReceivePipeline:
                 translated = self._translator.translate(text, lang, self._my_lang)
                 if translated:
                     log.info("[→%s] %s", self._my_lang, translated)
-                    self._subtitle.show(f"[{lang.upper()}] {translated}")
+                    self._subtitle.update_receive(f"對方: {translated}")
             except Exception as e:
                 log.error("Receive pipeline error: %s", e)
 
