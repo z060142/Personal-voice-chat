@@ -4,6 +4,10 @@
 - **發送**：你說話 → Whisper STT → OpenRouter LLM 翻譯 → Fish Speech TTS（你的音色）→ 虛擬麥克風 → Discord/遊戲
 - **接收**：對方語音（loopback）→ Whisper STT → OpenRouter LLM 翻譯 → 螢幕字幕
 
+## Feature Review
+
+針對原始「遊戲語音 → STT → 翻譯 → TTS」需求的功能審查、風險與 roadmap，請見 [`FEATURE_REVIEW.md`](FEATURE_REVIEW.md)。
+
 ## 架構
 
 ```
